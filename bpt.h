@@ -1,8 +1,7 @@
 #include <cstring>
 #include <iostream>
-
-#include <fstream>
 #include "vector.h"
+#include <fstream>
 
 using namespace std;
 
@@ -42,11 +41,7 @@ struct String {
     friend std::ostream &operator<<(std::ostream &os, const String &tmp) {
         return os << tmp.str;
     }
-    //
-    //    Key &operator=(const Key &rhs) {
-    //        if (this != &rhs) { memcpy(str, rhs.str, sizeof(str)); }
-    //        return *this;
-    //    }
+
 };
 
 struct id {
@@ -58,8 +53,8 @@ struct id {
 
 template<typename Key, class N>
 class bpt {
-    static const int M = 6;
-    static const int L = 6;
+    static const int M = 60;
+    static const int L = 60;
 
     struct Leaf {
         std::pair<Key, N> unit[L + 2];
@@ -122,13 +117,24 @@ public:
             file1.close();
         }
         in2.close();
+
+        file.open(nod);
+        file1.open(lef);
+        read_basic_leaf();
+        read_basic_node();
+        readNode(head_node, node_1_index);
+        readLeaf(head_leaf, leaf_1_index);
     }
 
-    ~bpt() = default;
+    ~bpt() {
+        write_basic_node(node_num, head_node.my_num);
+        write_basic_leaf(leaf_num, leaf_1_index);
+    }
 
     void writeNode(const Node &a, int index) {
         file.seekp((index - 1) * sizeof(Node) + 2 * sizeof(int));
         file.write(reinterpret_cast<const char *>(&a), sizeof(Node));
+        if (a.my_num == head_node.my_num) head_node = a;
     }
 
     void readNode(Node &a, int index) {
@@ -139,6 +145,7 @@ public:
     void writeLeaf(const Leaf &a, int index) {
         file1.seekp((index - 1) * sizeof(Leaf) + 2 * sizeof(int));
         file1.write(reinterpret_cast<const char *>(&a), sizeof(Leaf));
+        if (a.my_num == head_leaf.my_num) head_leaf = a;
     }
 
     void readLeaf(Leaf &a, int index) {
@@ -169,11 +176,6 @@ public:
         file1.write(reinterpret_cast<const char *>(&a), sizeof(int));
         file1.write(reinterpret_cast<const char *>(&b), sizeof(int));
     }
-//
-    void change_node_par(int index, int num) {
-        file.seekg(((index - 1) * sizeof(Node) + 2 * sizeof(int)));
-        file.write(reinterpret_cast<const char *>(&num), sizeof(int));
-    }
 
     void leaf_insert(Leaf &a, std::pair<Key, N> tmp) {
         for (int i = 1; i <= a.siz; ++i) {
@@ -196,7 +198,8 @@ public:
         if (node_i_ > a.siz) {
             a.key[++a.siz] = tmp;
             a.son[a.siz] = son_;
-        } else {
+        }
+        else {
             for (int j = a.siz; j >= node_i_; --j) {
                 a.key[j + 1] = a.key[j];
                 a.son[j + 1] = a.son[j];
@@ -211,7 +214,8 @@ public:
         if (node_i_ > a.siz) {
             a.key[++a.siz] = tmp;
             a.son[a.siz] = son_;
-        } else {
+        }
+        else {
             a.son[a.siz + 1] = a.son[a.siz];
             for (int j = a.siz; j >= node_i_; --j) {
                 a.key[j + 1] = a.key[j];
@@ -223,6 +227,7 @@ public:
         }
     }
 
+
     vector<id> find_node(Node &tar, std::pair<Key, N> tmp) {//ans中记录的是son的下标
         vector<id> ans;
         while (!tar.son_is_leaf) {
@@ -230,11 +235,13 @@ public:
                 int cur = tar.son[0];
                 ans.push_back(id(0, tar.my_num));
                 readNode(tar, cur);
-            } else if (tmp >= tar.key[tar.siz]) {
+            }
+            else if (tmp >= tar.key[tar.siz]) {
                 int cur = tar.son[tar.siz];
-                ans.push_back(id(tar.siz,tar.my_num));
+                ans.push_back(id(tar.siz, tar.my_num));
                 readNode(tar, cur);
-            } else {
+            }
+            else {
                 for (int i = 1; i < tar.siz; ++i) {
                     if (tar.key[i] <= tmp && tmp < tar.key[i + 1]) {
                         int cur = tar.son[i];
@@ -252,7 +259,8 @@ public:
         if (temp_leaf < tar.key[1]) {
             readLeaf(target_leaf, tar.son[0]);
             node_i = 0;
-        } else {
+        }
+        else {
             for (node_i = 1; node_i < tar.siz; ++node_i) {
                 if (tar.key[node_i] <= temp_leaf && temp_leaf < tar.key[node_i + 1]) {
                     readLeaf(target_leaf, tar.son[node_i]);
@@ -267,12 +275,6 @@ public:
     void insert(Key index, N value) {
         vector<id> node_position;
         std::pair<Key, N> temp_leaf(index, value);
-        file.open(nod);
-        file1.open(lef);
-        read_basic_leaf();
-        read_basic_node();
-        readNode(head_node, node_1_index);
-        readLeaf(head_leaf, leaf_1_index);
 
         if (head_node.siz == 0) {
             head_node.son[0] = head_leaf.my_num;
@@ -288,10 +290,11 @@ public:
                     tmp.unit[i] = head_leaf.unit[i + head_leaf.siz];
                 }
                 writeLeaf(tmp, tmp.my_num);
+                writeNode(head_node, head_node.my_num);
             }
-            writeNode(head_node, head_node.my_num);
             writeLeaf(head_leaf, head_leaf.my_num);
-        } else {
+        }
+        else {
 
             //find the node
             Node tar = head_node;
@@ -329,7 +332,8 @@ public:
                         int nodei = node_position.back().son_id + 1;
                         node_position.pop_back();
                         node_update1(par, nodei, tar.key[((M - 1) >> 1) + 1], ++node_num);
-                    } else {//建立新的根节点
+                    }
+                    else {//建立新的根节点
                         par.siz = 1;
                         par.son_is_leaf = 0;
                         par.key[1] = tar.key[((M - 1) >> 1) + 1];
@@ -354,11 +358,7 @@ public:
                 }
             }
         }
-        write_basic_node(node_num, head_node.my_num);
-        write_basic_leaf(leaf_num, leaf_1_index);
-
-        file.close();
-        file1.close();
+        node_1_index = head_node.my_num;
     }
 
 
@@ -396,12 +396,6 @@ public:
     void remove(Key index, N value) {
         vector<id> ans;
         std::pair<Key, N> temp_leaf(index, value);
-        file.open(nod);
-        file1.open(lef);
-        read_basic_leaf();
-        read_basic_node();
-        readNode(head_node, node_1_index);
-        readLeaf(head_leaf, leaf_1_index);
 
         //find the node
         Node tar = head_node;
@@ -411,8 +405,6 @@ public:
         if (head_leaf.next_num == 0) {
             leaf_remove(head_leaf, temp_leaf);
             writeLeaf(head_leaf, head_leaf.my_num);
-            file.close();
-            file1.close();
             return;
         }
         Leaf target_leaf;
@@ -422,8 +414,6 @@ public:
         //排除特殊情况——删除叶节点最上面的unit或者索引节点第0个儿子 索引节点的key需要更改
         int erase_leaf_res = leaf_remove(target_leaf, temp_leaf);
         if (!erase_leaf_res) {
-            file.close();
-            file1.close();
             return;
         }
         if (erase_leaf_res == 1) {
@@ -491,7 +481,8 @@ public:
                     target_leaf.siz += bro.siz;
                     target_leaf.next_num = bro.next_num;
                     node_update2(tar, node_i + 1);
-                } else {
+                }
+                else {
                     readLeaf(bro, tar.son[node_i - 1]);
                     for (int i = bro.siz + 1, j = 1; j <= target_leaf.siz; ++i, ++j) {
                         bro.unit[i] = target_leaf.unit[j];
@@ -504,8 +495,8 @@ public:
                 //judge the finding node to see if they need to be merged
                 while (tar.siz > 0 && tar.siz <= (M >> 1) - 1) {
 
-                    if (!ans.empty()){
-                        int par_id=ans.back().my_id;
+                    if (!ans.empty()) {
+                        int par_id = ans.back().my_id;
                         readNode(par, par_id);
                     }
                     else
@@ -554,14 +545,15 @@ public:
                                 node_1_index = tar.my_num;
                                 //                                break;
                             }
-                        } else {
+                        }
+                        else {
                             brother.key[++brother.siz] = par.key[nodei];
                             brother.son[brother.siz] = tar.son[0];
                             for (int i = 1, j = brother.siz + 1; i <= tar.siz; ++i, ++j) {
                                 node_update4(brother, j, tar.key[i], tar.son[i]);
                             }
                             node_update2(par, nodei);
-                            if (par.siz == 0 &&ans.empty())  {
+                            if (par.siz == 0 && ans.empty()) {
                                 head_node = brother;
                                 node_1_index = brother.my_num;
                             }
@@ -576,21 +568,10 @@ public:
         }
         writeLeaf(target_leaf, target_leaf.my_num);
         writeNode(tar, tar.my_num);
-
-        write_basic_node(node_num, node_1_index);
-        write_basic_leaf(leaf_num, leaf_1_index);
-        file.close();
-        file1.close();
     }
 
 
     vector<N> find(const Key &key) {
-        file.open(nod);
-        file1.open(lef);
-        read_basic_leaf();
-        read_basic_node();
-        readNode(head_node, node_1_index);
-        readLeaf(head_leaf, leaf_1_index);
         vector<N> ans;
         Node tar = head_node;
 
@@ -599,7 +580,8 @@ public:
             if (key <= tar.key[1].first) {
                 int cur = tar.son[0];
                 readNode(tar, cur);
-            } else {
+            }
+            else {
                 bool ok = false;
                 for (int i = 1; i < tar.siz; ++i) {
                     if (tar.key[i].first <= key && key <= tar.key[i + 1].first) {
@@ -613,14 +595,13 @@ public:
             }
         }
         Leaf target_leaf = head_leaf;
-        Leaf next;
-        readLeaf(next, head_leaf.next_num);
 
         //find leaf
         if (leaf_num > 1) {
             if (key <= tar.key[1].first) {
                 readLeaf(target_leaf, tar.son[0]);
-            } else {
+            }
+            else {
                 bool ok = false;
                 for (int node_i = 1; node_i < tar.siz; ++node_i) {
                     if (tar.key[node_i].first <= key && key <= tar.key[node_i + 1].first) {
@@ -648,10 +629,6 @@ public:
             if (num == 0) break;
             readLeaf(target_leaf, num);
         }
-        file.close();
-        file1.close();
         return ans;
     }
-
 };
-
