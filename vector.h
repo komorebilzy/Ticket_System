@@ -2,7 +2,6 @@
 #define SJTU_VECTOR_HPP
 
 #include "exception.h"
-
 #include <climits>
 #include <cstddef>
 
@@ -508,6 +507,13 @@
             if (size() == 0) throw container_is_empty();
             storage[current_siz-1].~T();
             --current_siz;
+        }
+        T pop(){
+            if (size() == 0) throw container_is_empty();
+            T tmp=storage[current_siz - 1];
+            storage[current_siz-1].~T();
+            --current_siz;
+            return tmp;
         }
     };
 
