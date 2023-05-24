@@ -17,11 +17,13 @@ struct train_data {
     int station_num;
     int prices[105];   //1_based prices[i]=stations[i]-stations[i+1]
     //this two time is calculated by startTime,travelTime and stopoverTimes
-    String<35> stations[105];  //1_based
-    Time leave_times[105];  //没有终点站 1->num-1
-    Time arrive_times[105];   //没有起始站 2->num
     Date start_date;
     Date end_date;
+    Time leave_times[105];  //没有终点站 1->num-1
+    Time arrive_times[105];   //没有起始站 2->num
+    String<35> stations[105];  //1_based
+
+
 
     train_data() {}
 
@@ -345,12 +347,12 @@ private:
         Time tmp2 = data.leave_times[s_num];
         adjust(tmp1, tmp2);
 //        if (curdate - tmp1 < 0) return false;
-        Date leave=curdate;
+        Date leave = curdate;
         if (curdate < tmp1) {
             start = data.start_date;
             leave = tmp1;
         } else start = data.start_date + (curdate - tmp1);
-        if (curdate==leave && tmp2 < curtime) {
+        if (curdate == leave && tmp2 < curtime) {
             start = start + 1;
             leave = leave + 1;
         }
@@ -541,11 +543,11 @@ public:
             transfer_data final = ans[0];
             if (sign == "time") {
                 for (int i = 1; i < ans.size(); ++i) {
-                    if (compare1( ans[i],final)) final = ans[i];
+                    if (compare1(ans[i], final)) final = ans[i];
                 }
             } else if (sign == "cost") {
                 for (int i = 1; i < ans.size(); ++i) {
-                    if (compare2(ans[i],final)) final = ans[i];
+                    if (compare2(ans[i], final)) final = ans[i];
                 }
             }
             ticket_data answer;
@@ -571,7 +573,7 @@ public:
         order_data orders;
         Date start;
         read_train(flag.back(), data);
-        if (!data.released) return "-1";
+        if (!data.released || num > data.seat_num) return "-1";
 
         int f_num, t_num, price = 0;
         bool exist = false;
@@ -604,11 +606,13 @@ public:
         int seat_num = 1000000000;
         //可以直接read或者write一个数组 求数组最小值
         path_a_day tmp;
+
         read_tickets(flag.back(), start - data.start_date, tmp);
 
         for (int i = f_num; i < t_num; ++i) {
             if (tmp.a[i - 1] < seat_num) seat_num = tmp.a[i - 1];
         }
+
         if (seat_num >= num) {
             for (int i = f_num; i < t_num; ++i) {
                 tmp.a[i - 1] -= num;

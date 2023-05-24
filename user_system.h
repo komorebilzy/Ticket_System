@@ -69,7 +69,8 @@ public:
     int add_user(const String<25> &cur_username, const String<25> &username, const user_data &data) {
         auto flag = user_list.find(cur_username);
         auto cur = users.find(cur_username);
-        if (flag != user_list.end() &&!cur.empty() && data.privilege < cur.back().privilege) {
+        auto exist = users.find(username);
+        if (flag != user_list.end() && !cur.empty() && exist.empty() && data.privilege < cur.back().privilege) {
             if (users.find(username).empty()) {
                 users.insert(username, data);
                 return 0;
@@ -79,7 +80,7 @@ public:
     }
 
     bool empty() {
-        return user_list.empty();
+        return users.empty();
     }
 
     bool check_login(const String<25> &username) {

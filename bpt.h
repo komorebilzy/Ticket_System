@@ -587,6 +587,10 @@ public:
         return ans;
     }
 
+    bool empty(){
+        return leaf_num==1&&head_leaf.siz==0;
+    }
+
 
     void clean() {
         Node a;
