@@ -26,16 +26,19 @@ public:
         }
     }
 
-    Date operator+(const int x) {
-        d += x;
-        if (m == 6 && d > 30) {
-            d %= 30;
-            m += d / 30;
-        } else if (d > 31) {
-            d %= 31;
-            m+= d / 31;
-        }
-        return *this;
+
+    friend Date operator+(Date tmp, const int x) {
+        Date ans = tmp;
+        ans.d += x;
+        while (ans.d > 31 || ans.m == 6 && ans.d > 30)
+            if (ans.m == 6 && ans.d > 30) {
+                ans.m += 1;
+                ans.d -= 30;
+            } else if (ans.d > 31) {
+                ans.m += 1;
+                ans.d -= 31;
+            }
+        return ans;
     }
 
     void operator--() {
@@ -52,18 +55,24 @@ public:
 
 
     friend int operator-(Date a, Date b) {
-        int res = 0;
-        while (a.m > b.m) {
-            res += a.d;
-            a.d = 1;
-            --a;
+        if (a > b) {
+            int res = 0;
+            while (a.m > b.m) {
+                res += a.d;
+                a.d = 1;
+                --a;
+            }
+            return res + a.d - b.d;
+        } else if (a == b) {
+            return 0;
+        } else if (a < b) {
+            return -1 * (b - a);
         }
-        return res + a.d - b.d;
     }
 
 
-    friend std::ostream operator<<(std::ostream &os, const Date &date) {
-        os << '0' << date.m << '-' << date.d / 10 << date.d % 10;
+    friend std::ostream &operator<<(std::ostream &os, const Date &date) {
+        return os << '0' << date.m << '-' << date.d / 10 << date.d % 10;
     }
 
     friend bool operator==(const Date &a, const Date &b) {
@@ -76,6 +85,14 @@ public:
 
     friend bool operator>(const Date &a, const Date &b) {
         return !(a == b || a < b);
+    }
+
+    friend bool operator<=(const Date &a, const Date &b) {
+        return a == b || a < b;
+    }
+
+    friend bool operator>=(const Date &a, const Date &b) {
+        return a == b || a > b;
     }
 
 };
@@ -125,8 +142,13 @@ public:
         return a.h < b.h || a.h == b.h && a.m < b.m;
     }
 
-    friend std::ostream operator<<(std::ostream &os, const Time &time) {
-        os << time.h / 10 << time.h % 10 << ':' << time.m / 10 << time.m % 10;
+
+    friend std::ostream &operator<<(std::ostream &os, const Time &time) {
+        return os << time.h / 10 << time.h % 10 << ':' << time.m / 10 << time.m % 10;
+    }
+
+    friend bool operator==(const Time &a, const Time &b) {
+        return a.h == b.h && a.m == b.m;
     }
 
 };

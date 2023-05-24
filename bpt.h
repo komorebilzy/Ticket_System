@@ -40,7 +40,7 @@ private:
 
         Node(int siz_, int num_, int l) : siz(siz_), my_num(num_), son_is_leaf(l) {}
 
-        Node(const Node &rhs):siz(rhs.siz),my_num(rhs.my_num),son_is_leaf(rhs.son_is_leaf){}
+//        Node(const Node &rhs):siz(rhs.siz),my_num(rhs.my_num),son_is_leaf(rhs.son_is_leaf){}
     };
 
     int leaf_num = 1;

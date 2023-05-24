@@ -49,13 +49,13 @@ struct user_data {
 class User_System {
 private:
 
-    bpt<String<25>, user_data> users;
+    bpt<String<25>, user_data> users{"user_node", "user_leaf"};
 
     map<String<25>, bool> user_list;
 
 
 public:
-    User_System() : users("user_node", "user_leaf") {}
+    User_System() {}
 
     ~User_System() {};
 
@@ -68,8 +68,8 @@ public:
 
     int add_user(const String<25> &cur_username, const String<25> &username, const user_data &data) {
         auto flag = user_list.find(cur_username);
-        auto cur = users.find(cur_username).back();
-        if (flag != user_list.end() && data.privilege < cur.privilege) {
+        auto cur = users.find(cur_username);
+        if (flag != user_list.end() &&!cur.empty() && data.privilege < cur.back().privilege) {
             if (users.find(username).empty()) {
                 users.insert(username, data);
                 return 0;
@@ -109,9 +109,10 @@ public:
 
     std::string query_profile(const String<25> &cur_username, const String<25> &u) {
         auto flag = user_list.find(cur_username);
-        auto cur = users.find(cur_username).back();
+        auto cur = users.find(cur_username);
         auto now = users.find(u);
-        if (flag != user_list.end() && !now.empty() && cur.privilege >= now.back().privilege) {
+        if (flag != user_list.end() && !cur.empty() && !now.empty() &&
+            (cur.back().privilege > now.back().privilege || cur.back() == now.back())) {
             auto tmp = now.back();
             std::string username, name, mailAddr, pri;
             username = u.str;
@@ -127,13 +128,14 @@ public:
 
     std::string modify_profile(const String<25> &c, const String<25> &u, vector<std::string> phrases) {
         auto flag = user_list.find(c);
-        auto cur = users.find(c).back();
+        auto cur = users.find(c);
         auto now = users.find(u);
-        if (flag != user_list.end() && !now.empty() && cur.privilege >= now.back().privilege) {
+        if (flag != user_list.end() && !cur.empty() && !now.empty() &&
+            (cur.back().privilege > now.back().privilege || cur.back() == now.back())) {
             user_data data = now.back();
             user_data tmp = data;
             int i = 1;
-            while (i < phrases.size()-1) {
+            while (i < phrases.size() - 1) {
                 std::string parm = phrases[++i];
                 if (parm == "-p") {
                     strcpy(data.password.str, phrases[++i].c_str());
@@ -143,7 +145,7 @@ public:
                     strcpy(data.mailAddr.str, phrases[++i].c_str());
                 } else if (parm == "-g") {
                     int pri = atoi(phrases[++i].c_str());
-                    if (pri < cur.privilege) {
+                    if (pri < cur.back().privilege) {
                         data.privilege = pri;
                     } else return "-1";
                 }
@@ -159,7 +161,6 @@ public:
             return username;
         }
         return "-1";
-
     }
 
     void clean() {

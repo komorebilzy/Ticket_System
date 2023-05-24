@@ -9,31 +9,21 @@
 #include "Data.h"
 #include <algorithm>
 
+
 struct train_data {
-    String<40> stations[105];  //1_based
+    char type;
+    bool released = false;
     int seat_num;
     int station_num;
     int prices[105];   //1_based prices[i]=stations[i]-stations[i+1]
     //this two time is calculated by startTime,travelTime and stopoverTimes
+    String<35> stations[105];  //1_based
     Time leave_times[105];  //没有终点站 1->num-1
     Time arrive_times[105];   //没有起始站 2->num
     Date start_date;
     Date end_date;
-    char type;
-    bool released = false;
 
     train_data() {}
-
-    train_data(const train_data &a) : station_num(a.station_num), seat_num(a.seat_num), start_date(a.start_date),
-                                      end_date(a.end_date), released(a.released) {
-        for (int i = 1; i <= station_num - 1; ++i) {
-            stations[i] = a.stations[i];
-            prices[i] = a.prices[i];
-            leave_times[i] = a.leave_times[i];
-            if (i != 1) arrive_times[i] = a.arrive_times[i];
-        }
-        arrive_times[station_num] = a.arrive_times[station_num];
-    }
 
     friend bool operator==(const train_data &a, const train_data &b) {
         return a.seat_num == b.seat_num && a.station_num == b.station_num && a.type == b.type;
@@ -77,15 +67,17 @@ private:
         int price_sum;
         ticket_data first;
         ticket_data second;
-        String<40> transfer;
+        String<35> transfer;
     };
 
     struct order_data {
+        int f_num, t_num;
+        Date start;
         Date start_date;
         String<25> username;
         int status;    //1-success 2-pending 3-refunded
         String<25> train_id;
-        String<40> from, to;
+        String<35> from, to;
         Date leave_date;
         Time leave_time;
         Date arrive_date;
@@ -101,20 +93,20 @@ private:
         path_a_day b[100];
     };
 
-    bpt<String<25>, int> train;
+    bpt<String<25>, int> train{"train_node", "train_leaf"};
     std::fstream train_detail;
     int index = 0;
 
-    bpt<String<40>, String<25>> station_name_based_train;   //station_name->train_id
+    bpt<String<35>, String<25>> station_name_based_train{"s_n_b_t_node", "s_n_b_t_leaf"};   //station_name->train_id
 
-    std::fstream ticket;  //id-date-station->ticket_num
+    std::fstream ticket;  //id-date-station->ticket_num  0-based
 
 
-    bpt<String<25>, int> order; // user to int      the int is -index1
+    bpt<String<25>, int> order{"order_node", "order_leaf"}; // user to int      the int is -index1
     std::fstream order_detail;  //int->order_detail
     int index1 = 0;
 
-    bpt<String<25>, int> pending;  //id->int
+    bpt<String<25>, int> pending{"pending_node", "pending_leaf"};  //id->int
 
     void read_train(int index_, train_data &m) {
         train_detail.seekg(sizeof(int) + (index_ - 1) * sizeof(train_data));
@@ -137,20 +129,20 @@ private:
     }
 
 
-    void read_ticket(int id, int date, int station, int a) {
+    void read_ticket(int id, int date, int station, int &a) {
         int index_ = (id - 1) * 10000 + date * 100 + station;
         ticket.seekg(index_ * sizeof(int));
         ticket.read(reinterpret_cast<char *>(&a), sizeof(int));
     }
 
-    void read_tickets(int id, int date, path_a_day a) {
+    void read_tickets(int id, int date, path_a_day &a) {
         int index_ = (id - 1) * 10000 + date * 100;
         ticket.seekg(index_ * sizeof(int));
         ticket.read(reinterpret_cast<char *>(&a), sizeof(path_a_day));
     }
 
-    void write_tickets(int index_, date_ticket a) {
-        ticket.seekp((index_ - 1) * sizeof(a));
+    void write_tickets(int id, date_ticket a) {
+        ticket.seekp((id - 1) * sizeof(a));
         ticket.write(reinterpret_cast<const char *>(&a), sizeof(a));
     }
 
@@ -162,10 +154,7 @@ private:
 
 
 public:
-    Train_system() : train("train_node", "train_leaf"),
-                     station_name_based_train("s_n_b_t_node", "s_n_b_t_leaf"),
-                     order("order_node", "order_leaf"),
-                     pending("pending_node", "pending_leaf") {
+    Train_system() {
 
         std::fstream in1("train_detail");
         if (!in1) {
@@ -235,7 +224,7 @@ public:
         if (!flag.empty()) {
             train_data data;
             read_train(flag.back(), data);
-            if (data.released) {
+            if (!data.released) {
                 train.remove(id, flag.back());
                 return 0;
             }
@@ -256,13 +245,13 @@ public:
                 }
                 date_ticket date_station;
                 for (int i = 0; i < data.end_date - data.start_date + 1; ++i) {
-                    for (int j = 0; j < data.station_num; ++j) {
+                    for (int j = 0; j < data.station_num - 1; ++j) {
                         date_station.b[i].a[j] = data.seat_num;
                     }
                 }
                 write_tickets(flag.back(), date_station);
+                return 0;
             }
-            return 0;
         }
         return -1;
     }
@@ -272,15 +261,16 @@ public:
         if (!flag.empty()) {
             train_data data;
             read_train(flag.back(), data);
-            if (data.start_date < d && d < data.end_date) {
+            if (data.start_date <= d && d <= data.end_date) {
                 std::cout << id << " " << data.type << "\n";
                 int ticket_num;
                 Date date = d;
                 Time time = data.leave_times[1];
                 adjust(date, time);
-                read_ticket(flag.back(), d - data.start_date, 0, ticket_num);
+                if (!data.released) ticket_num = data.seat_num;
+                else read_ticket(flag.back(), d - data.start_date, 0, ticket_num);
                 std::cout << data.stations[1] << " xx-xx xx:xx -> " << date << " " << time
-                          << " 0 " << data.seat_num << "\n";
+                          << " 0 " << ticket_num << "\n";
                 int price = 0;
                 for (int i = 2; i <= data.station_num - 1; ++i) {
                     price += data.prices[i - 1];
@@ -291,11 +281,12 @@ public:
                     date = d;
                     time = data.leave_times[i];
                     adjust(date, time);
-                    read_ticket(flag.back(), d - data.start_date, i - 1, ticket_num);
+                    if (!data.released) ticket_num = data.seat_num;
+                    else read_ticket(flag.back(), d - data.start_date, i - 1, ticket_num);
                     std::cout << date << " " << time << " " << price << " " << ticket_num << "\n";
                 }
                 date = d;
-                time = data.leave_times[data.station_num];
+                time = data.arrive_times[data.station_num];
                 adjust(date, time);
                 price += data.prices[data.station_num - 1];
                 std::cout << data.stations[data.station_num] << " " << date << " " << time << " -> xx-xx xx:xx "
@@ -312,8 +303,12 @@ private:
         Date tmp1 = data.start_date;
         Time tmp2 = data.leave_times[s_num];
         adjust(tmp1, tmp2);
+//        Time time3;time3.m=21,time3.h=17;
+//        if(strcmp(ans.train_id.str,"TOtheeoldcause") && tmp2==time3){
+//            int a=0;
+//        }
         start = data.start_date + (curdate - tmp1);
-        if (curdate - tmp1 < 0) return false;
+        if (curdate - tmp1 < 0 || start > data.end_date) return false;
         ans.leave_date = curdate;
         ans.leave_time = tmp2;
         tmp1 = start;
@@ -322,6 +317,7 @@ private:
         ans.arrive_date = tmp1;
         ans.arrive_time = tmp2;
         ans.time = query_time(ans.leave_date, ans.leave_time, ans.arrive_date, ans.arrive_time);
+//        std::cout<<"test "<<ans.leave_date<<" "<<ans.arrive_date<<" "<<start<<"\n";
         return true;
     }
 
@@ -330,7 +326,8 @@ private:
         Time tmp2 = data.leave_times[s_num];
         adjust(tmp1, tmp2);
         start = data.start_date + (curdate - tmp1);
-        if (curdate - tmp1 < 0) return false;
+        if (curdate - tmp1 < 0 || start > data.end_date)
+            return false;
         ans.leave_date = curdate;
         ans.leave_time = tmp2;
         tmp1 = start;
@@ -347,14 +344,18 @@ private:
         Date tmp1 = data.start_date;
         Time tmp2 = data.leave_times[s_num];
         adjust(tmp1, tmp2);
-        start = data.start_date + (curdate - tmp1);
-        if (curdate - tmp1 < 0) return false;
-        if (tmp2 < curtime) {
+//        if (curdate - tmp1 < 0) return false;
+        Date leave=curdate;
+        if (curdate < tmp1) {
+            start = data.start_date;
+            leave = tmp1;
+        } else start = data.start_date + (curdate - tmp1);
+        if (curdate==leave && tmp2 < curtime) {
             start = start + 1;
-            curdate = curdate + 1;
+            leave = leave + 1;
         }
         if (start > data.end_date) return false;
-        ans.leave_date = curdate;
+        ans.leave_date = leave;
         ans.leave_time = tmp2;
         tmp1 = start;
         tmp2 = data.arrive_times[t_num];
@@ -379,23 +380,26 @@ private:
     }
 
     bool compare1(transfer_data a, transfer_data b) {
-        if (a.time_sum == b.time_sum) {
-            return a.price_sum < b.price_sum;
-        }
-        return a.time_sum < b.time_sum;
+        if (a.time_sum != b.time_sum) return a.time_sum < b.time_sum;
+        if (a.price_sum != b.price_sum) return a.price_sum < b.price_sum;
+        if (a.first.train_id != b.first.train_id) return a.first.train_id < b.first.train_id;
+        return a.second.train_id < b.second.train_id;
     }
 
     bool compare2(transfer_data a, transfer_data b) {
-        if (a.price_sum == b.price_sum) {
-            return a.time_sum < b.time_sum;
-        }
-        return a.price_sum < b.price_sum;
+        if (a.price_sum != b.price_sum) return a.price_sum < b.price_sum;
+        if (a.time_sum != b.time_sum) return a.time_sum < b.time_sum;
+        if (a.first.train_id != b.first.train_id) return a.first.train_id < b.first.train_id;
+        return a.second.train_id < b.second.train_id;
     }
 
 public:
-    void query_ticket(const Date &date, const String<40> &s, const String<40> &t, std::string sign) {
+    void
+    query_ticket(const Date &date, const String<35> &s, const String<35> &t, std::string sign, std::string timeOrder) {
         vector<ticket_data> tickets;
         auto ids = station_name_based_train.find(s);
+
+//        auto ids1=station_name_based_train.find(t);
         for (int i = 0; i < ids.size(); ++i) {
             //enum the id
             ticket_data ans;
@@ -403,13 +407,14 @@ public:
             ans.train_id = id;
             train_data data;
             read_train(train.find(id).back(), data);
+            if (!data.released) continue;
             //from s to t
             bool flag = false;
             int s_num, t_num;
             for (int j = 1; j <= data.station_num; ++j) {
                 if (data.stations[j] == s) {
                     s_num = j;
-                    while (j <= data.station_num) {
+                    while (j < data.station_num) {
                         if (data.stations[++j] == t) {
                             flag = true;
                             t_num = j;
@@ -422,35 +427,9 @@ public:
             if (flag) {
                 Date start;
                 if (!date_change(ans, data, s_num, t_num, date, start)) continue;
-//                Date tmp1 = data.start_date;
-//                Time tmp2 = data.leave_times[s_num];
-//                adjust(tmp1, tmp2);
-//                Date start = data.start_date + (date - tmp1);
-//                if (date - tmp1 < 0) continue;
-//                ans.leave_date = date;
-//                ans.leave_time = tmp2;
-//                tmp1 = start;
-//                tmp2 = data.arrive_times[t_num];
-//                adjust(tmp1, tmp2);
-//                ans.arrive_date = tmp1;
-//                ans.arrive_time = tmp2;
-//                ans.time = query_time(ans.leave_date, ans.leave_time, ans.arrive_date, ans.arrive_time);
-
-                //price and seat
-//                int price = 0;
-//                int seat = 100000000;
-//                for (int j = s_num; j < t_num; ++j) {
-//                    price += data.prices[j];
-//                    int seat_;
-//                    read_ticket(train.find(id).back(), start - data.start_date, j - 1, seat_);
-//                    seat = std::min(seat, seat_);
-//                }
-//                ans.price = price;
-//                ans.seat = seat;
                 cost_seat(ans, data, id, s_num, t_num, start);
                 tickets.push_back(ans);
             }
-
         }
         int siz = tickets.size();
         int *array = new int[siz];
@@ -458,9 +437,15 @@ public:
             array[i] = i;
 
         if (sign == "time") {
-            std::sort(array, array + siz, [&tickets](int x, int y) { return tickets[x].time < tickets[y].time; });
+            std::sort(array, array + siz, [&tickets](int x, int y) {
+                return tickets[x].time < tickets[y].time ||
+                       tickets[x].time == tickets[y].time && tickets[x].train_id < tickets[y].train_id;
+            });
         } else if (sign == "cost") {
-            std::sort(array, array + siz, [&tickets](int x, int y) { return tickets[x].price < tickets[y].price; });
+            std::sort(array, array + siz, [&tickets](int x, int y) {
+                return tickets[x].price < tickets[y].price ||
+                       tickets[x].price == tickets[y].price && tickets[x].train_id < tickets[y].train_id;
+            });
         }
         std::cout << siz << "\n";
         for (int i = 0; i < siz; ++i) {
@@ -471,16 +456,18 @@ public:
         }
     }
 
-    void query_transfer(const Date &date, const String<40> &s, const String<40> &t, std::string sign) {
+    void query_transfer(const Date &date, const String<35> &s, const String<35> &t, std::string sign,
+                        std::string timeOrder) {
         vector<transfer_data> ans;
         auto ids1 = station_name_based_train.find(s);
-        auto ids3 = station_name_based_train.find(t);
         for (int i = 0; i < ids1.size(); ++i) {
             ticket_data ans1;
-            String<40> transfer;
+            String<35> transfer;
             String<25> id1 = ids1[i];
+            ans1.train_id = id1;
             train_data data1;
             read_train(train.find(id1).back(), data1);
+            if (!data1.released) continue;
             //the first train
             int s1_num, t1_num;
             Date start1;
@@ -496,28 +483,35 @@ public:
                             ticket_data ans2;
                             train_data data2;
                             String<25> id2 = ids2[k];
-                            bool if_reach = false;
-                            for (int x = 0; x < ids3.size(); ++x) {
-                                if (ids3[x] == id2) {
-                                    if_reach = true;
-                                    break;
-                                }
-                            }
-                            if (id2 == id1 || !if_reach) continue;
+                            ans2.train_id = id2;
+//                            bool if_reach = false;
+//                            for (int x = 0; x < ids3.size(); ++x) {
+//                                if (ids3[x] == id2) {
+//                                    if_reach = true;
+//                                    break;
+//                                }
+//                            }
+//                          if(!if_reach) continue;
+                            if (id2 == id1) continue;
                             read_train(train.find(id2).back(), data2);
+                            if (!data2.released) continue;
                             //the second train
                             int s2_num, t2_num;
                             Date start2;
+                            bool flag = false;
                             for (int m = 1; m <= data2.station_num; ++m) {
                                 if (data2.stations[m] == transfer) {
                                     s2_num = m;
-                                    while (m <= data2.station_num) {
+                                    while (m < data2.station_num) {
                                         if (data2.stations[++m] == t) {
                                             t2_num = m;
+                                            flag = true;
+                                            m = data2.station_num + 1;
                                         }
                                     }
                                 }
                             }
+                            if (!flag) continue;
                             //date and time
                             if (!date_change(ans1, data1, s1_num, t1_num, date, start1)) continue;
                             if (!transfer_date(ans2, data2, s2_num, t2_num, ans1.arrive_date, ans1.arrive_time,
@@ -533,8 +527,8 @@ public:
                             tmp.price_sum = ans1.price + ans2.price;
                             tmp.time_sum = query_time(ans1.leave_date, ans1.leave_time, ans2.arrive_date,
                                                       ans2.arrive_time);
-                            ans.push_back(tmp);
 
+                            ans.push_back(tmp);
                         }
                     }
                 }
@@ -547,16 +541,15 @@ public:
             transfer_data final = ans[0];
             if (sign == "time") {
                 for (int i = 1; i < ans.size(); ++i) {
-                    if (compare1(final, ans[i])) final = ans[i];
+                    if (compare1( ans[i],final)) final = ans[i];
                 }
             } else if (sign == "cost") {
                 for (int i = 1; i < ans.size(); ++i) {
-                    if (compare2(final, ans[i])) final = ans[i];
+                    if (compare2(ans[i],final)) final = ans[i];
                 }
             }
             ticket_data answer;
             answer = final.first;
-
             std::cout << answer.train_id << " " << s << " " << answer.leave_date << " " << answer.leave_time << " -> "
                       << final.transfer << " " << answer.arrive_date << " " << answer.arrive_time << " " << answer.price
                       << " " << answer.seat << "\n";
@@ -569,8 +562,10 @@ public:
     }
 
 
-    std::string buy_ticket(String<25> user, String<25> id, Date d, String<40> f, String<40> t, int num, bool q) {
+    std::string buy_ticket(String<25> user, String<25> id, Date d, String<35> f, String<35> t, int num, bool q,
+                           std::string timeOrder) {
         auto flag = train.find(id);
+
         if (flag.empty()) return "-1";
         train_data data;
         order_data orders;
@@ -579,50 +574,58 @@ public:
         if (!data.released) return "-1";
 
         int f_num, t_num, price = 0;
+        bool exist = false;
+
         for (int j = 1; j <= data.station_num; ++j) {
             if (data.stations[j] == f) {
                 f_num = j;
-                while (j <= data.station_num) {
+                while (j < data.station_num) {
                     price += data.prices[j];
                     if (data.stations[++j] == t) {
                         t_num = j;
+                        exist = true;
                         j = data.station_num + 1;
                     }
                 }
             }
         }
+        if (!exist) return "-1";
+        if (!order_date(orders, data, f_num, t_num, d, start)) return "-1";
         orders.price = price;
         orders.username = user;
         orders.train_id = id;
         orders.num = num;
         orders.from = f;
         orders.to = t;
-        if (!order_date(orders, data, f_num, t_num, d, start)) return "-1";
-        orders.start_date = start;
+        orders.f_num = f_num;
+        orders.t_num = t_num;
+        orders.start_date = data.start_date;
+        orders.start = start;
         int seat_num = 1000000000;
         //可以直接read或者write一个数组 求数组最小值
         path_a_day tmp;
         read_tickets(flag.back(), start - data.start_date, tmp);
+
         for (int i = f_num; i < t_num; ++i) {
-            if (tmp.a[i] < seat_num) seat_num = tmp.a[i];
+            if (tmp.a[i - 1] < seat_num) seat_num = tmp.a[i - 1];
         }
         if (seat_num >= num) {
             for (int i = f_num; i < t_num; ++i) {
-                tmp.a[i] -= num;
+                tmp.a[i - 1] -= num;
             }
             write_ticket(flag.back(), start - data.start_date, tmp);
             orders.status = 1;
             write_orders(++index1, orders);
             order.insert(user, index1 * -1);
-            return std::to_string(price);
+            return std::to_string(price * num);
         }
         if (!q) return "-1";
         else {
             orders.status = 2;
             write_orders(++index1, orders);
             order.insert(user, index1 * -1);
-            pending.insert(id, index1 * -1);
-            return "pending";
+            pending.insert(id, index1);
+            return "queue";
         }
     }
 
@@ -632,52 +635,60 @@ public:
         order_data data;
         for (int i = 0; i < list.size(); ++i) {
             read_orders((-1) * list[i], data);
-            std::cout << data.status << " " << data.train_id << " " << data.from << ' ' << data.leave_date << " "
+            if (data.status == 1) std::cout << "[success] ";
+            else if (data.status == 2) std::cout << "[pending] ";
+            else if (data.status == 3) std::cout << "[refunded] ";
+            std::cout << data.train_id << " " << data.from << ' ' << data.leave_date << " "
                       << data.leave_time << " -> " << data.to << " " << data.arrive_date << " " << data.arrive_time
                       << " " << data.price << " " << data.num << "\n";
         }
     }
 
 private:
-    bool refund_buy(order_data p) {
+    bool refund_buy(order_data &p) {
         auto flag = train.find(p.train_id);
-        train_data data;
-        read_train(flag.back(), data);
         path_a_day tmp;
-        read_tickets(flag.back(), p.leave_date - p.start_date, tmp);
-        int f_num, t_num, price = 0;
-        for (int j = 1; j <= data.station_num; ++j) {
-            if (data.stations[j] == p.from) {
-                f_num = j;
-                while (j <= data.station_num) {
-                    if (data.stations[++j] == p.to) {
-                        t_num = j;
-                        j = data.station_num + 1;
-                    }
-                }
-            }
-        }
+        read_tickets(flag.back(), p.start - p.start_date, tmp);
+//        int f_num, t_num;
+//        for (int j = 1; j <= data.station_num; ++j) {
+//            if (data.stations[j] == p.from) {
+//                f_num = j;
+//                while (j < data.station_num) {
+//                    if (data.stations[++j] == p.to) {
+//                        t_num = j;
+//                        j = data.station_num + 1;
+//                    }
+//                }
+//            }
+//        }
         int seat_num = 1000000000;
-        for (int i = f_num; i < t_num; ++i) {
-            if (tmp.a[i] < seat_num) seat_num = tmp.a[i];
+        for (int i = p.f_num; i < p.t_num; ++i) {
+            if (tmp.a[i - 1] < seat_num) seat_num = tmp.a[i - 1];
         }
         if (seat_num >= p.num) {
-            for (int i = f_num; i < t_num; ++i) {
-                tmp.a[i] -= p.num;
+            for (int i = p.f_num; i < p.t_num; ++i) {
+                tmp.a[i - 1] -= p.num;
             }
-            write_ticket(flag.back(), p.leave_date - p.start_date, tmp);
-            p.status = 3;
+            write_ticket(flag.back(), p.start - p.start_date, tmp);
+            p.status = 1;
             return true;
-        } else return false;
+        }
+        return false;
     }
 
 public:
     void refund_ticket(String<25> u, int num) {
         auto list = order.find(u);
+        if (list.empty() || num > list.size()) {
+            std::cout << "-1\n";
+            return;
+        }
         order_data data;   //退订订单
         read_orders((-1) * list[num - 1], data);
-        if (data.status == 3) std::cout << "-1\n";
-        else if (data.status == 2) {
+        if (data.status == 3) {
+            std::cout << "-1\n";
+            return;
+        } else if (data.status == 2) {
             data.status = 3;
             write_orders((-1) * list[num - 1], data);
             pending.remove(data.train_id, (-1) * list[num - 1]);
@@ -687,21 +698,20 @@ public:
             std::cout << "0\n";
             write_orders((-1) * list[num - 1], data);
             path_a_day tmp;
-            read_tickets(train.find(data.train_id).back(), data.leave_date - data.start_date, tmp);
-            for (int i = 0; i < 100; ++i) {
-                tmp.a[i] += data.num;
+            read_tickets(train.find(data.train_id).back(), data.start - data.start_date, tmp);
+            for (int i = data.f_num; i < data.t_num; ++i) {
+                tmp.a[i - 1] += data.num;
             }
-            write_ticket(train.find(data.train_id).back(), data.leave_date - data.start_date, tmp);
+            write_ticket(train.find(data.train_id).back(), data.start - data.start_date, tmp);
             auto ans = pending.find(data.train_id);   //可能符合条件的候补订单
             order_data pos;
             for (int i = 0; i < ans.size(); ++i) {
-                read_orders(ans[i] * (-1), pos);
+                read_orders(ans[i], pos);
                 if (refund_buy(pos)) {
-                    write_orders((-1) * ans[i], pos);
-                    pending.remove(pos.train_id, ans[i] * (-1));
-                    return;
+//                    std::cout<<pos.username<<" "<<pos.train_id <<pos.from<<" "<<pos.to<<" "<<pos.status;
+                    write_orders(ans[i], pos);
+                    pending.remove(pos.train_id, ans[i]);
                 }
-//                buy_ticket(u, data.train_id, data.leave_date, data.from, data.to, data.num, true);
             }
         }
     }
