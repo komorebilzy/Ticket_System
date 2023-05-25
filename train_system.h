@@ -9,14 +9,14 @@
 #include "Data.h"
 #include <algorithm>
 
-
 struct train_data {
-    bool released ;
+    bool released;
     char type;
     int seat_num;
     int station_num;
     int prices[105];   //1_based prices[i]=stations[i]-stations[i+1]
     //this two time is calculated by startTime,travelTime and stopoverTimes
+    String<25> id;
     Date start_date;
     Date end_date;
     Time leave_times[105];  //没有终点站 1->num-1
@@ -96,7 +96,7 @@ private:
     std::fstream train_detail;
     int index = 0;
 
-    bpt<String<35>, String<25>> station_name_based_train{"s_n_b_t_node", "s_n_b_t_leaf"};   //station_name->train_id
+    bpt<String<35>, int> station_name_based_train{"s_n_b_t_node", "s_n_b_t_leaf"};   //station_name->train_id
 
     std::fstream ticket;  //id-date-station->ticket_num  0-based
 
@@ -241,7 +241,7 @@ public:
                 data.released = true;
                 write_train(flag.back(), data);
                 for (int i = 1; i <= data.station_num; ++i) {
-                    station_name_based_train.insert(data.stations[i], id);
+                    station_name_based_train.insert(data.stations[i], flag.back());
                 }
                 date_ticket date_station;
                 for (int i = 0; i < data.end_date - data.start_date + 1; ++i) {
@@ -303,10 +303,6 @@ private:
         Date tmp1 = data.start_date;
         Time tmp2 = data.leave_times[s_num];
         adjust(tmp1, tmp2);
-//        Time time3;time3.m=21,time3.h=17;
-//        if(strcmp(ans.train_id.str,"TOtheeoldcause") && tmp2==time3){
-//            int a=0;
-//        }
         start = data.start_date + (curdate - tmp1);
         if (curdate - tmp1 < 0 || start > data.end_date) return false;
         ans.leave_date = curdate;
@@ -340,7 +336,8 @@ private:
 
 
     bool
-    transfer_date(ticket_data &ans, const train_data &data, int s_num, int t_num, Date curdate, const Time &curtime, Date &start) {
+    transfer_date(ticket_data &ans, const train_data &data, int s_num, int t_num, Date curdate, const Time &curtime,
+                  Date &start) {
         Date tmp1 = data.start_date;
         Time tmp2 = data.leave_times[s_num];
         adjust(tmp1, tmp2);
@@ -366,13 +363,13 @@ private:
 
     }
 
-    void cost_seat(ticket_data &ans, const train_data &data, String<25> id, int s_num, int t_num, Date start) {
+    void cost_seat(ticket_data &ans, const train_data &data, int pos, int s_num, int t_num, Date start) {
         int price = 0;
         int seat = 100000000;
         for (int j = s_num; j < t_num; ++j) {
             price += data.prices[j];
             int seat_;
-            read_ticket(train.find(id).back(), start - data.start_date, j - 1, seat_);
+            read_ticket(pos, start - data.start_date, j - 1, seat_);
             seat = std::min(seat, seat_);
         }
         ans.price = price;
@@ -395,18 +392,27 @@ private:
 
 public:
     void
-    query_ticket(const Date &date, const String<35> &s, const String<35> &t, std::string sign, std::string timeOrder) {
+    query_ticket(const Date &date, const String<35> &s, const String<35> &t, std::string sign) {
         vector<ticket_data> tickets;
         auto ids = station_name_based_train.find(s);
+        auto ids1 = station_name_based_train.find(t);
+        map<int, bool> query;
+        vector<int> right_train;
 
-//        auto ids1=station_name_based_train.find(t);
-        train_data data;
         for (int i = 0; i < ids.size(); ++i) {
+            query.insert(std::pair<int, bool>(ids[i], true));
+        }
+        for (int i = 0; i < ids1.size(); ++i) {
+            if (query.find(ids1[i]) != query.end()) right_train.push_back(ids1[i]);
+        }
+
+        train_data data;
+        for (int i = 0; i < right_train.size(); ++i) {
             //enum the id
             ticket_data ans;
-            String<25> id = ids[i];
-            ans.train_id = id;
-            read_train(train.find(id).back(), data);
+            read_train(right_train[i], data);
+
+            ans.train_id = data.id;
             if (!data.released) continue;
             //from s to t
             bool flag = false;
@@ -427,7 +433,7 @@ public:
             if (flag) {
                 Date start;
                 if (!date_change(ans, data, s_num, t_num, date, start)) continue;
-                cost_seat(ans, data, id, s_num, t_num, start);
+                cost_seat(ans, data, right_train[i], s_num, t_num, start);
                 tickets.push_back(ans);
             }
         }
@@ -460,15 +466,17 @@ public:
                         std::string timeOrder) {
         vector<transfer_data> ans;
         auto ids1 = station_name_based_train.find(s);
+        auto ids3 = station_name_based_train.find(t);
         train_data data1;
         train_data data2;
+
         for (int i = 0; i < ids1.size(); ++i) {
             ticket_data ans1;
             String<35> transfer;
-            String<25> id1 = ids1[i];
-            ans1.train_id = id1;
 
-            read_train(train.find(id1).back(), data1);
+
+            read_train(ids1[i], data1);
+            ans1.train_id = data1.id;
             if (!data1.released) continue;
             //the first train
             int s1_num, t1_num;
@@ -484,18 +492,9 @@ public:
 
                         for (int k = 0; k < ids2.size(); ++k) {
                             ticket_data ans2;
-                            String<25> id2 = ids2[k];
-                            ans2.train_id = id2;
-//                            bool if_reach = false;
-//                            for (int x = 0; x < ids3.size(); ++x) {
-//                                if (ids3[x] == id2) {
-//                                    if_reach = true;
-//                                    break;
-//                                }
-//                            }
-//                          if(!if_reach) continue;
-                            if (id2 == id1) continue;
-                            read_train(train.find(id2).back(), data2);
+                            if (ids1[i] == ids2[k]) continue;
+                            read_train(ids2[k], data2);
+                            ans2.train_id = data2.id;
                             if (!data2.released) continue;
                             //the second train
                             int s2_num, t2_num;
@@ -520,8 +519,8 @@ public:
                                                start2))
                                 continue;
                             //price and seat
-                            cost_seat(ans1, data1, id1, s1_num, t1_num, start1);
-                            cost_seat(ans2, data2, id2, s2_num, t2_num, start2);
+                            cost_seat(ans1, data1, ids1[i], s1_num, t1_num, start1);
+                            cost_seat(ans2, data2, ids2[k], s2_num, t2_num, start2);
                             transfer_data tmp;
                             tmp.transfer = transfer;
                             tmp.first = ans1;

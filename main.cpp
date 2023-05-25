@@ -9,6 +9,7 @@
 
 using std::string;
 using std::cin, std::cout, std::ifstream, std::ofstream, std::to_string;
+
 vector<string> phrase(const string &str) {
     vector<string> phrases;
     char op;
@@ -18,9 +19,9 @@ vector<string> phrase(const string &str) {
         while (!isspace(op = str[i])) {
             element += op;
             ++i;
-            if(i==str.size()) break;
+            if (i == str.size()) break;
         }
-        if(element.size())phrases.push_back(element);
+        if (element.size())phrases.push_back(element);
         ++i;
     }
     return phrases;
@@ -35,7 +36,7 @@ int run() {
 //    user_system.clean();
 //    train_system.clean();
     string str;
-    int a=0;
+    int a = 0;
     while (!cin.eof()) {
         getline(cin, str);
         vector<string> phrases(phrase(str));
@@ -48,7 +49,7 @@ int run() {
 
         string order = phrases[1];
         int i = 1;
-        int siz=phrases.size()-1;
+        int siz = phrases.size() - 1;
         if (order == "add_user") {
             String<25> cur_username;
             String<25> username;
@@ -126,6 +127,7 @@ int run() {
                 string parm = phrases[++i];
                 if (parm == "-i") {
                     strcpy(id.str, phrases[++i].c_str());
+                    data.id = id;
                 } else if (parm == "-n") {
                     data.station_num = std::atoi(phrases[++i].c_str());
                 } else if (parm == "-m") {
@@ -137,7 +139,7 @@ int run() {
                     while (k < tmp.size()) {
                         s += tmp[k];
                         ++k;
-                        if (tmp[k] == '|'|| k==tmp.size()) {
+                        if (tmp[k] == '|' || k == tmp.size()) {
                             strcpy(data.stations[++j].str, s.c_str());
                             s = "";
                             ++k;
@@ -150,7 +152,7 @@ int run() {
                     while (k < tmp.size()) {
                         s += tmp[k];
                         ++k;
-                        if (tmp[k] == '|'|| k==tmp.size()) {
+                        if (tmp[k] == '|' || k == tmp.size()) {
                             data.prices[++j] = std::atoi(s.c_str());
                             s = "";
                             ++k;
@@ -160,7 +162,6 @@ int run() {
                     Time starttime(phrases[++i]);
                     data.leave_times[1] += starttime;
                     data.arrive_times[2] += starttime;
-//                    data.leave_times[2] += starttime;
                 } else if (parm == "-t") {
                     std::string tmp = phrases[++i];
                     int k = 0, j = 1;
@@ -168,7 +169,7 @@ int run() {
                     while (k < tmp.size()) {
                         s += tmp[k];
                         ++k;
-                        if (tmp[k] == '|'||k==tmp.size()) {
+                        if (tmp[k] == '|' || k == tmp.size()) {
                             data.arrive_times[++j] += std::atoi(s.c_str());
                             data.leave_times[j] += std::atoi(s.c_str());
                             s = "";
@@ -183,7 +184,7 @@ int run() {
                     while (k < tmp.size()) {
                         s += tmp[k];
                         ++k;
-                        if (tmp[k] == '|' ||k==tmp.size()) {
+                        if (tmp[k] == '|' || k == tmp.size()) {
                             data.leave_times[++j] += std::atoi(s.c_str());
                             data.arrive_times[j + 1] += std::atoi(s.c_str());
                             s = "";
@@ -226,7 +227,7 @@ int run() {
                 }
             }
             cout << train_system.delete_train(id) << "\n";
-        } else if(order=="release_train"){
+        } else if (order == "release_train") {
             String<25> id;
             while (i < siz) {
                 string parm = phrases[++i];
@@ -234,12 +235,8 @@ int run() {
                     strcpy(id.str, phrases[++i].c_str());
                 }
             }
-            if(timeOrder=="[46206]"){
-                int a=0;
-            }
-            cout<<train_system.release_train(id)<<"\n";
-        }
-        else if (order == "query_train") {
+            cout << train_system.release_train(id) << "\n";
+        } else if (order == "query_train") {
             String<25> id;
             std::string date;
             while (i < siz) {
@@ -254,7 +251,7 @@ int run() {
         } else if (order == "query_ticket") {
             Date date;
             String<35> s, t;
-            std::string index="time";
+            std::string index = "time";
             while (i < siz) {
                 string parm = phrases[++i];
                 if (parm == "-s") {
@@ -268,11 +265,11 @@ int run() {
                 }
             }
 
-            train_system.query_ticket(date, s, t, index,timeOrder);
+            train_system.query_ticket(date, s, t, index);
         } else if (order == "query_transfer") {
             Date date;
             String<35> s, t;
-            std::string index="time";
+            std::string index = "time";
             while (i < siz) {
                 string parm = phrases[++i];
                 if (parm == "-s") {
@@ -285,14 +282,14 @@ int run() {
                     index = phrases[++i];
                 }
             }
-            train_system.query_transfer(date, s, t, index,timeOrder);
+            train_system.query_transfer(date, s, t, index, timeOrder);
         } else if (order == "buy_ticket") {
             String<25> u;
             String<25> id;
             Date date;
             String<35> f, t;
             int num;
-            bool q= false;
+            bool q = false;
             while (i < siz) {
                 string parm = phrases[++i];
                 if (parm == "-f") {
@@ -302,70 +299,63 @@ int run() {
                 } else if (parm == "-d") {
                     date = Date(phrases[++i]);
                 } else if (parm == "-q") {
-                    if(phrases[++i]=="true") q= true;
-                    else if(phrases[i]=="false") q= false;
-                }
-                else if(parm=="-u"){
+                    if (phrases[++i] == "true") q = true;
+                    else if (phrases[i] == "false") q = false;
+                } else if (parm == "-u") {
                     strcpy(u.str, phrases[++i].c_str());
-                }
-                else if(parm=="-i"){
+                } else if (parm == "-i") {
                     strcpy(id.str, phrases[++i].c_str());
-                }
-                else if(parm=="-n"){
-                    num=std::atoi(phrases[++i].c_str());
+                } else if (parm == "-n") {
+                    num = std::atoi(phrases[++i].c_str());
                 }
             }
-            if(!user_system.check_login(u)) {
-                cout<<"-1\n";
+            if (!user_system.check_login(u)) {
+                cout << "-1\n";
                 continue;
             }
-            cout<<train_system.buy_ticket(u,id,date,f,t,num,q,timeOrder)<<"\n";
+            cout << train_system.buy_ticket(u, id, date, f, t, num, q, timeOrder) << "\n";
 
-        }
-        else if(order=="query_order"){
+        } else if (order == "query_order") {
             String<25> u;
-            string parm=phrases[++i];
-            if(parm=="-u"){
+            string parm = phrases[++i];
+            if (parm == "-u") {
                 strcpy(u.str, phrases[++i].c_str());
             }
-            if(!user_system.check_login(u)){
-                cout<<"-1\n";
+            if (!user_system.check_login(u)) {
+                cout << "-1\n";
                 continue;
             }
             train_system.query_order(u);
-        }
-        else if(order=="refund_ticket"){
+        } else if (order == "refund_ticket") {
             String<25> u;
-            int num=1;
+            int num = 1;
             while (i < siz) {
                 string parm = phrases[++i];
-                if(parm=="-u"){
+                if (parm == "-u") {
                     strcpy(u.str, phrases[++i].c_str());
-                }
-                else if(parm=="-n"){
-                    num= std::atoi(phrases[++i].c_str());
+                } else if (parm == "-n") {
+                    num = std::atoi(phrases[++i].c_str());
                 }
             }
-            if(!user_system.check_login(u)){
-                cout<<"-1\n";
+            if (!user_system.check_login(u)) {
+                cout << "-1\n";
                 continue;
             }
 
             train_system.refund_ticket(u, num);
-        }
-        else if(order=="clean"){
+        } else if (order == "clean") {
             user_system.clean();
             train_system.clean();
-            cout<<"0\n";
-        }
-        else if(order=="exit"){
-            cout<<"bye\n";
+            cout << "0\n";
+        } else if (order == "exit") {
+            cout << "bye\n";
             return 0;
         }
     }
 
 
 }
+
 int main() {
     return run();
 }
