@@ -7,9 +7,9 @@
 #include "bpt.h"
 
 struct user_data {
-    String<35> password;
+    String<31> password;
     String<20> name;
-    String<35> mailAddr;
+    String<31> mailAddr;
     int privilege;
 
     user_data() {}
@@ -49,9 +49,9 @@ struct user_data {
 class User_System {
 private:
 
-    bpt<String<25>, user_data> users{"user_node", "user_leaf"};
+    bpt<String<21>, user_data> users{"user_node", "user_leaf"};
 
-    map<String<25>, bool> user_list;
+    map<String<21>, bool> user_list;
 
 
 public:
@@ -60,13 +60,13 @@ public:
     ~User_System() {};
 
 
-    int add_first_user(const String<25> &username, const user_data &data) {
+    int add_first_user(const String<21> &username, const user_data &data) {
         users.insert(username, data);
-//        user_list.insert(std::pair<String<25>,bool>(username, false));
+//        user_list.insert(std::pair<String<21>,bool>(username, false));
         return 0;
     }
 
-    int add_user(const String<25> &cur_username, const String<25> &username, const user_data &data) {
+    int add_user(const String<21> &cur_username, const String<21> &username, const user_data &data) {
         auto flag = user_list.find(cur_username);
         auto cur = users.find(cur_username);
         auto exist = users.find(username);
@@ -83,23 +83,23 @@ public:
         return users.empty();
     }
 
-    bool check_login(const String<25> &username) {
+    bool check_login(const String<21> &username) {
         auto flag = user_list.find(username);
         if (flag == user_list.end()) return false;
         return true;
     }
 
-    int login(const String<25> &username, const String<35> &pass) {
+    int login(const String<21> &username, const String<31> &pass) {
         auto flag = user_list.find(username);
         auto cur = users.find(username);
         if (flag == user_list.end() && !cur.empty() && cur.back().password == pass) {
-            user_list.insert(std::pair<String<25>, bool>(username, true));
+            user_list.insert(std::pair<String<21>, bool>(username, true));
             return 0;
         }
         return -1;
     }
 
-    int logout(const String<25> &username) {
+    int logout(const String<21> &username) {
         auto flag = user_list.find(username);
         if (flag != user_list.end()) {
             user_list.erase(flag);
@@ -108,7 +108,7 @@ public:
         return -1;
     }
 
-    std::string query_profile(const String<25> &cur_username, const String<25> &u) {
+    std::string query_profile(const String<21> &cur_username, const String<21> &u) {
         auto flag = user_list.find(cur_username);
         auto cur = users.find(cur_username);
         auto now = users.find(u);
@@ -127,7 +127,7 @@ public:
     }
 
 
-    std::string modify_profile(const String<25> &c, const String<25> &u, vector<std::string> phrases) {
+    std::string modify_profile(const String<21> &c, const String<21> &u, vector<std::string> phrases) {
         auto flag = user_list.find(c);
         auto cur = users.find(c);
         auto now = users.find(u);

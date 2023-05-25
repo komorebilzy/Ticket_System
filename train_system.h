@@ -14,14 +14,14 @@ struct train_data {
     char type;
     int seat_num;
     int station_num;
-    int prices[105];   //1_based prices[i]=stations[i]-stations[i+1]
+    int prices[101];   //1_based prices[i]=stations[i]-stations[i+1]
     //this two time is calculated by startTime,travelTime and stopoverTimes
-    String<25> id;
+    String<21> id;
     Date start_date;
     Date end_date;
-    Time leave_times[105];  //没有终点站 1->num-1
-    Time arrive_times[105];   //没有起始站 2->num
-    String<35> stations[105];  //1_based
+    Time leave_times[101];  //没有终点站 1->num-1
+    Time arrive_times[101];   //没有起始站 2->num
+    String<31> stations[101];  //1_based
 
 
     friend bool operator==(const train_data &a, const train_data &b) {
@@ -54,7 +54,7 @@ private:
         int time;
         int price;
         int seat;
-        String<25> train_id;
+        String<21> train_id;
         Date leave_date;
         Time leave_time;
         Date arrive_date;
@@ -66,17 +66,17 @@ private:
         int price_sum;
         ticket_data first;
         ticket_data second;
-        String<35> transfer;
+        String<31> transfer;
     };
 
     struct order_data {
         int f_num, t_num;
         Date start;
         Date start_date;
-        String<25> username;
+        String<21> username;
         int status;    //1-success 2-pending 3-refunded
-        String<25> train_id;
-        String<35> from, to;
+        String<21> train_id;
+        String<31> from, to;
         Date leave_date;
         Time leave_time;
         Date arrive_date;
@@ -92,20 +92,20 @@ private:
         path_a_day b[100];
     };
 
-    bpt<String<25>, int> train{"train_node", "train_leaf"};
+    bpt<String<21>, int> train{"train_node", "train_leaf"};
     std::fstream train_detail;
     int index = 0;
 
-    bpt<String<35>, int> station_name_based_train{"s_n_b_t_node", "s_n_b_t_leaf"};   //station_name->train_id
+    bpt<String<31>, int> station_name_based_train{"s_n_b_t_node", "s_n_b_t_leaf"};   //station_name->train_id
 
     std::fstream ticket;  //id-date-station->ticket_num  0-based
 
 
-    bpt<String<25>, int> order{"order_node", "order_leaf"}; // user to int      the int is -index1
+    bpt<String<21>, int> order{"order_node", "order_leaf"}; // user to int      the int is -index1
     std::fstream order_detail;  //int->order_detail
     int index1 = 0;
 
-    bpt<String<25>, int> pending{"pending_node", "pending_leaf"};  //id->int
+    bpt<String<21>, int> pending{"pending_node", "pending_leaf"};  //id->int
 
     void read_train(int index_, train_data &m) {
         train_detail.seekg(sizeof(int) + (index_ - 1) * sizeof(train_data));
@@ -208,7 +208,7 @@ public:
     }
 
 
-    int add_train(const String<25> &id, const train_data &data) {
+    int add_train(const String<21> &id, const train_data &data) {
         auto flag = train.find(id);
         if (flag.empty()) {
             train.insert(id, ++index);
@@ -218,7 +218,7 @@ public:
         return -1;
     }
 
-    int delete_train(const String<25> &id) {
+    int delete_train(const String<21> &id) {
         auto flag = train.find(id);
         if (!flag.empty()) {
             bool released;
@@ -232,7 +232,7 @@ public:
         return -1;
     }
 
-    int release_train(const String<25> &id) {
+    int release_train(const String<21> &id) {
         auto flag = train.find(id);
         if (!flag.empty()) {
             train_data data;
@@ -256,7 +256,7 @@ public:
         return -1;
     }
 
-    void query_train(const String<25> &id, const Date &d) {
+    void query_train(const String<21> &id, const Date &d) {
         auto flag = train.find(id);
         if (!flag.empty()) {
             train_data data;
@@ -392,7 +392,7 @@ private:
 
 public:
     void
-    query_ticket(const Date &date, const String<35> &s, const String<35> &t, std::string sign) {
+    query_ticket(const Date &date, const String<31> &s, const String<31> &t, std::string sign) {
         vector<ticket_data> tickets;
         auto ids = station_name_based_train.find(s);
         auto ids1 = station_name_based_train.find(t);
@@ -462,7 +462,7 @@ public:
         }
     }
 
-    void query_transfer(const Date &date, const String<35> &s, const String<35> &t, std::string sign,
+    void query_transfer(const Date &date, const String<31> &s, const String<31> &t, std::string sign,
                         std::string timeOrder) {
         vector<transfer_data> ans;
         auto ids1 = station_name_based_train.find(s);
@@ -472,7 +472,7 @@ public:
 
         for (int i = 0; i < ids1.size(); ++i) {
             ticket_data ans1;
-            String<35> transfer;
+            String<31> transfer;
 
 
             read_train(ids1[i], data1);
@@ -563,7 +563,7 @@ public:
     }
 
 
-    std::string buy_ticket(String<25> user, String<25> id, Date d, String<35> f, String<35> t, int num, bool q,
+    std::string buy_ticket(String<21> user, String<21> id, Date d, String<31> f, String<31> t, int num, bool q,
                            std::string timeOrder) {
         auto flag = train.find(id);
 
@@ -632,7 +632,7 @@ public:
         }
     }
 
-    void query_order(String<25> user) {
+    void query_order(String<21> user) {
         auto list = order.find(user);
         std::cout << list.size() << "\n";
         order_data data;
@@ -668,7 +668,7 @@ private:
     }
 
 public:
-    void refund_ticket(String<25> u, int num) {
+    void refund_ticket(String<21> u, int num) {
         auto list = order.find(u);
         if (list.empty() || num > list.size()) {
             std::cout << "-1\n";
