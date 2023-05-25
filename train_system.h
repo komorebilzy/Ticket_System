@@ -11,8 +11,8 @@
 
 
 struct train_data {
+    bool released ;
     char type;
-    bool released = false;
     int seat_num;
     int station_num;
     int prices[105];   //1_based prices[i]=stations[i]-stations[i+1]
@@ -23,9 +23,6 @@ struct train_data {
     Time arrive_times[105];   //没有起始站 2->num
     String<35> stations[105];  //1_based
 
-
-
-    train_data() {}
 
     friend bool operator==(const train_data &a, const train_data &b) {
         return a.seat_num == b.seat_num && a.station_num == b.station_num && a.type == b.type;
@@ -224,9 +221,10 @@ public:
     int delete_train(const String<25> &id) {
         auto flag = train.find(id);
         if (!flag.empty()) {
-            train_data data;
-            read_train(flag.back(), data);
-            if (!data.released) {
+            bool released;
+            train_detail.seekg(sizeof(int) + (flag.back() - 1) * sizeof(train_data));
+            train_detail.read(reinterpret_cast<char *>(&released), sizeof(bool));
+            if (!released) {
                 train.remove(id, flag.back());
                 return 0;
             }
@@ -301,7 +299,7 @@ public:
 
 private:
 
-    bool date_change(ticket_data &ans, train_data data, int s_num, int t_num, Date curdate, Date &start) {
+    bool date_change(ticket_data &ans, const train_data &data, int s_num, int t_num, Date curdate, Date &start) {
         Date tmp1 = data.start_date;
         Time tmp2 = data.leave_times[s_num];
         adjust(tmp1, tmp2);
@@ -323,7 +321,7 @@ private:
         return true;
     }
 
-    bool order_date(order_data &ans, train_data data, int s_num, int t_num, Date curdate, Date &start) {
+    bool order_date(order_data &ans, const train_data &data, int s_num, int t_num, Date curdate, Date &start) {
         Date tmp1 = data.start_date;
         Time tmp2 = data.leave_times[s_num];
         adjust(tmp1, tmp2);
@@ -342,7 +340,7 @@ private:
 
 
     bool
-    transfer_date(ticket_data &ans, train_data data, int s_num, int t_num, Date curdate, Time curtime, Date &start) {
+    transfer_date(ticket_data &ans, const train_data &data, int s_num, int t_num, Date curdate, const Time &curtime, Date &start) {
         Date tmp1 = data.start_date;
         Time tmp2 = data.leave_times[s_num];
         adjust(tmp1, tmp2);
@@ -368,7 +366,7 @@ private:
 
     }
 
-    void cost_seat(ticket_data &ans, train_data data, String<25> id, int s_num, int t_num, Date start) {
+    void cost_seat(ticket_data &ans, const train_data &data, String<25> id, int s_num, int t_num, Date start) {
         int price = 0;
         int seat = 100000000;
         for (int j = s_num; j < t_num; ++j) {
@@ -402,12 +400,12 @@ public:
         auto ids = station_name_based_train.find(s);
 
 //        auto ids1=station_name_based_train.find(t);
+        train_data data;
         for (int i = 0; i < ids.size(); ++i) {
             //enum the id
             ticket_data ans;
             String<25> id = ids[i];
             ans.train_id = id;
-            train_data data;
             read_train(train.find(id).back(), data);
             if (!data.released) continue;
             //from s to t
@@ -462,12 +460,14 @@ public:
                         std::string timeOrder) {
         vector<transfer_data> ans;
         auto ids1 = station_name_based_train.find(s);
+        train_data data1;
+        train_data data2;
         for (int i = 0; i < ids1.size(); ++i) {
             ticket_data ans1;
             String<35> transfer;
             String<25> id1 = ids1[i];
             ans1.train_id = id1;
-            train_data data1;
+
             read_train(train.find(id1).back(), data1);
             if (!data1.released) continue;
             //the first train
@@ -481,9 +481,9 @@ public:
                         t1_num = j;
                         transfer = data1.stations[j];
                         auto ids2 = station_name_based_train.find(transfer);
+
                         for (int k = 0; k < ids2.size(); ++k) {
                             ticket_data ans2;
-                            train_data data2;
                             String<25> id2 = ids2[k];
                             ans2.train_id = id2;
 //                            bool if_reach = false;
@@ -653,18 +653,6 @@ private:
         auto flag = train.find(p.train_id);
         path_a_day tmp;
         read_tickets(flag.back(), p.start - p.start_date, tmp);
-//        int f_num, t_num;
-//        for (int j = 1; j <= data.station_num; ++j) {
-//            if (data.stations[j] == p.from) {
-//                f_num = j;
-//                while (j < data.station_num) {
-//                    if (data.stations[++j] == p.to) {
-//                        t_num = j;
-//                        j = data.station_num + 1;
-//                    }
-//                }
-//            }
-//        }
         int seat_num = 1000000000;
         for (int i = p.f_num; i < p.t_num; ++i) {
             if (tmp.a[i - 1] < seat_num) seat_num = tmp.a[i - 1];

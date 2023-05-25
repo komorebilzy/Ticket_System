@@ -8,7 +8,7 @@ public:
     int m;
     int d;
 
-    Date() {}
+    Date() =default;
 
     Date(const std::string &a) {
         m = (a[1] - '0');
@@ -103,7 +103,7 @@ public:
     int h = 0;
     int m = 0;
 
-    Time() {}
+    Time() =default;
 
     Time(const std::string &a) {
         h = 10 * (a[0] - '0') + (a[1] - '0');
