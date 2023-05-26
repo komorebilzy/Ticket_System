@@ -472,7 +472,7 @@ public:
 
     void query_transfer(const Date &date, const String<31> &s, const String<31> &t, std::string sign,
                         std::string timeOrder) {
-        vector<transfer_data> ans;
+//        vector<transfer_data> ans;
         auto ids1 = station_name_based_train.find(s);
         auto ids3 = station_name_based_train.find(t);
         train_data data1;
@@ -482,22 +482,21 @@ public:
             return;
         }
         map<String<31>, vector<int>> query_trans;
-
+        vector<query_tra> info;
+        static String<31> station[101];
         for (int i = 0; i < ids1.size(); ++i) {
-            String<31> station[101];
             int num;
             train_detail.seekg(sizeof(int) + (ids1[i] - 1) * sizeof(train_data) + 2068);
             train_detail.read(reinterpret_cast<char *> (&num),4);
             train_detail.read(reinterpret_cast<char *>(&station), sizeof(station));
             for (int j = 1; j <= num; ++j) {
                 if (station[j] == s) {
-                    while (j < 100) query_trans[station[++j]].push_back(ids1[i]);
+                    while (j < num) query_trans[station[++j]].push_back(ids1[i]);
                 }
             }
         }
 
         for (int i = 0; i < ids3.size(); ++i) {
-            String<31> station[101];
             int num=0;
             train_detail.seekg(sizeof(int) + (ids3[i] - 1) * sizeof(train_data) + 2068);
             train_detail.read(reinterpret_cast<char *> (&num),4);
@@ -510,85 +509,93 @@ public:
                 }
             }
             for (int j = 0; j < pos; ++j) {
-                vector<int> first_train = query_trans[station[j]];
+                auto p = query_trans.find(station[j]);
+                if (p == query_trans.end()) continue;
+                vector<int> const &first_train = p->second;
                 for (int k = 0; k < first_train.size(); ++k) {
                     if(first_train[k]==ids3[i]) continue;
-//                    info.push_back(query_tra(first_train[k], ids3[i], station[j]));
-
-                        ticket_data ans1;
-                        ticket_data ans2;
-                        read_train(first_train[k],data1);
-                        read_train( ids3[i],data2);
-                        if(!data1.released || !data2.released) continue;
-                        ans1.train_id = data1.id;
-                        ans2.train_id = data2.id;
-                        int s1_num, t1_num;
-                        int s2_num, t2_num;
-                        bool flag1= false;
-                        bool flag2= false;
-                        for(int m=1;m<data1.station_num;++m){
-                            if(data1.stations[m]==s){
-                                s1_num=m;
-                                while (m < data1.station_num) {
-                                    if (data1.stations[++m] == station[m]) {
-                                        flag1=true;
-                                        t1_num = m;
-                                        m = data1.station_num + 1;
-                                    }
-                                }
-                            }
+                    info.push_back(query_tra(first_train[k], ids3[i], station[j]));
+                }
+            }
+        }
+        ticket_data ans1;
+        ticket_data ans2;
+        transfer_data final;
+        bool exist= false;
+        auto compare_fun = (sign == "time" ? &Train_system::compare1 : &Train_system::compare2);
+        for(int i=0;i<info.size();++i){
+            read_train(info[i].id1,data1);
+            read_train(info[i].id2,data2);
+            if(!data1.released || !data2.released) continue;
+            ans1.train_id = data1.id;
+            ans2.train_id = data2.id;
+            int s1_num, t1_num;
+            int s2_num, t2_num;
+            bool flag1= false;
+            bool flag2= false;
+            for(int j=1;j<data1.station_num;++j){
+                if(data1.stations[j]==s){
+                    s1_num=j;
+                    while (j < data1.station_num) {
+                        if (data1.stations[++j] == info[i].transfer) {
+                            flag1=true;
+                            t1_num = j;
+                            j = data1.station_num + 1;
                         }
-                        for(int m=1;m<data2.station_num;++m){
-                            if(data2.stations[m]==station[m]){
-                                s2_num=m;
-                                while (m < data2.station_num) {
-                                    if (data2.stations[++m] == t) {
-                                        flag2=true;
-                                        t2_num = m;
-                                        m = data2.station_num + 1;
-                                    }
-                                }
-                            }
+                    }
+                }
+            }
+            for(int j=1;j<data2.station_num;++j){
+                if(data2.stations[j]==info[i].transfer){
+                    s2_num=j;
+                    while (j < data2.station_num) {
+                        if (data2.stations[++j] == t) {
+                            flag2=true;
+                            t2_num = j;
+                            j = data2.station_num + 1;
                         }
-                        if(!flag2||!flag1) continue;
-                        Date start1,start2;
-                        if (!date_change(ans1, data1, s1_num, t1_num, date, start1)) continue;
-                        if (!transfer_date(ans2, data2, s2_num, t2_num, ans1.arrive_date, ans1.arrive_time,
-                                           start2))
-                            continue;
-                        //price and seat
-                        cost_seat(ans1, data1, first_train[k], s1_num, t1_num, start1);
-                        cost_seat(ans2, data2, ids3[i], s2_num, t2_num, start2);
-                        transfer_data tmp;
-                        tmp.transfer = station[j];
-                        tmp.first = ans1;
-                        tmp.second = ans2;
-                        tmp.price_sum = ans1.price + ans2.price;
-                        tmp.time_sum = query_time(ans1.leave_date, ans1.leave_time, ans2.arrive_date,
-                                                  ans2.arrive_time);
+                    }
+                }
+            }
+            if(!flag2||!flag1) continue;
+            Date start1,start2;
+            if (!date_change(ans1, data1, s1_num, t1_num, date, start1)) continue;
+            if (!transfer_date(ans2, data2, s2_num, t2_num, ans1.arrive_date, ans1.arrive_time,
+                               start2))
+                continue;
+            //price and seat
+            cost_seat(ans1, data1, info[i].id1, s1_num, t1_num, start1);
+            cost_seat(ans2, data2, info[i].id2, s2_num, t2_num, start2);
+            transfer_data tmp;
+            tmp.transfer = info[i].transfer;
+            tmp.first = ans1;
+            tmp.second = ans2;
+            tmp.price_sum = ans1.price + ans2.price;
+            tmp.time_sum = query_time(ans1.leave_date, ans1.leave_time, ans2.arrive_date,
+                                      ans2.arrive_time);
 
-                        ans.push_back(tmp);
-
+//            ans.push_back(tmp);
+            if(!exist){
+                exist=true;
+                final=tmp;
+            }
+            else {
+                if(sign=="time")  {
+                    if (compare1(tmp, final)) final = tmp;
+                }
+                else if(sign=="cost"){
+                    if (compare2(tmp, final)) final = tmp;
                 }
             }
         }
 
-
-
-        if (ans.empty()) {
+//        auto compare_fun = (sign == "time" ? &Train_system::compare1 : &Train_system::compare2);
+//
+//        if (this->*compare_fun(ans[i], final))
+        if (!exist) {
             std::cout << "0" << "\n";
             return;
         } else {
-            transfer_data final = ans[0];
-            if (sign == "time") {
-                for (int i = 1; i < ans.size(); ++i) {
-                    if (compare1(ans[i], final)) final = ans[i];
-                }
-            } else if (sign == "cost") {
-                for (int i = 1; i < ans.size(); ++i) {
-                    if (compare2(ans[i], final)) final = ans[i];
-                }
-            }
             ticket_data answer;
             answer = final.first;
             std::cout << answer.train_id << " " << s << " " << answer.leave_date << " " << answer.leave_time << " -> "
