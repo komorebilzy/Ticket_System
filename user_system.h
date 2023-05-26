@@ -43,6 +43,7 @@ struct user_data {
         name = a.name;
         mailAddr = a.mailAddr;
         privilege = a.privilege;
+        return *this;
     }
 };
 

@@ -13,7 +13,6 @@ struct train_data {
     bool released;
     char type;
     int seat_num;
-    int station_num;
     int prices[101];   //1_based prices[i]=stations[i]-stations[i+1]
     //this two time is calculated by startTime,travelTime and stopoverTimes
     String<21> id;
@@ -21,6 +20,7 @@ struct train_data {
     Date end_date;
     Time leave_times[101];  //没有终点站 1->num-1
     Time arrive_times[101];   //没有起始站 2->num
+    int station_num;
     String<31> stations[101];  //1_based
 
 
@@ -83,6 +83,14 @@ private:
         Time arrive_time;
         int price;
         int num;
+    };
+
+    struct query_tra {
+        int id1;
+        int id2;
+        String<31> transfer;
+
+        query_tra(int id1_, int id2_, const String<31> trans) : id1(id1_), id2(id2_), transfer(trans) {}
     };
 
     struct path_a_day {
@@ -376,14 +384,14 @@ private:
         ans.seat = seat;
     }
 
-    bool compare1(transfer_data a, transfer_data b) {
+    inline bool compare1(transfer_data a, transfer_data b) {
         if (a.time_sum != b.time_sum) return a.time_sum < b.time_sum;
         if (a.price_sum != b.price_sum) return a.price_sum < b.price_sum;
         if (a.first.train_id != b.first.train_id) return a.first.train_id < b.first.train_id;
         return a.second.train_id < b.second.train_id;
     }
 
-    bool compare2(transfer_data a, transfer_data b) {
+    inline bool compare2(transfer_data a, transfer_data b) {
         if (a.price_sum != b.price_sum) return a.price_sum < b.price_sum;
         if (a.time_sum != b.time_sum) return a.time_sum < b.time_sum;
         if (a.first.train_id != b.first.train_id) return a.first.train_id < b.first.train_id;
@@ -469,72 +477,104 @@ public:
         auto ids3 = station_name_based_train.find(t);
         train_data data1;
         train_data data2;
+        if(ids1.empty()||ids3.empty()) {
+            std::cout << "0" << "\n";
+            return;
+        }
+        map<String<31>, vector<int>> query_trans;
+        vector<query_tra> info;
 
         for (int i = 0; i < ids1.size(); ++i) {
+            String<31> station[101];
+            int num;
+            train_detail.seekg(sizeof(int) + (ids1[i] - 1) * sizeof(train_data) + 2068);
+            train_detail.read(reinterpret_cast<char *> (&num),4);
+            train_detail.read(reinterpret_cast<char *>(&station), sizeof(station));
+            for (int j = 1; j <= num; ++j) {
+                if (station[j] == s) {
+                    while (j < 100) query_trans[station[++j]].push_back(ids1[i]);
+                }
+            }
+        }
+
+        for (int i = 0; i < ids3.size(); ++i) {
+            String<31> station[101];
+            int num=0;
+            train_detail.seekg(sizeof(int) + (ids3[i] - 1) * sizeof(train_data) + 2068);
+            train_detail.read(reinterpret_cast<char *> (&num),4);
+            train_detail.read(reinterpret_cast<char *>(&station), sizeof(station));
+            int pos=0;
+            for (int j = 1; j <= num; ++j) {
+                if (station[j] == t) {
+                    pos = j;
+                    break;
+                }
+            }
+            for (int j = 0; j < pos; ++j) {
+                vector<int> first_train = query_trans[station[j]];
+                for (int k = 0; k < first_train.size(); ++k) {
+                    if(first_train[k]==ids3[i]) continue;
+                    info.push_back(query_tra(first_train[k], ids3[i], station[j]));
+                }
+            }
+        }
+
+        for(int i=0;i<info.size();++i){
             ticket_data ans1;
-            String<31> transfer;
-
-
-            read_train(ids1[i], data1);
+            ticket_data ans2;
+            read_train(info[i].id1,data1);
+            read_train(info[i].id2,data2);
+            if(!data1.released || !data2.released) continue;
             ans1.train_id = data1.id;
-            if (!data1.released) continue;
-            //the first train
+            ans2.train_id = data2.id;
             int s1_num, t1_num;
-            Date start1;
-            for (int j = 1; j <= data1.station_num; ++j) {
-                if (data1.stations[j] == s) {
-                    //transfer
-                    s1_num = j;
-                    while (++j <= data1.station_num) {
-                        t1_num = j;
-                        transfer = data1.stations[j];
-                        auto ids2 = station_name_based_train.find(transfer);
-
-                        for (int k = 0; k < ids2.size(); ++k) {
-                            ticket_data ans2;
-                            if (ids1[i] == ids2[k]) continue;
-                            read_train(ids2[k], data2);
-                            ans2.train_id = data2.id;
-                            if (!data2.released) continue;
-                            //the second train
-                            int s2_num, t2_num;
-                            Date start2;
-                            bool flag = false;
-                            for (int m = 1; m <= data2.station_num; ++m) {
-                                if (data2.stations[m] == transfer) {
-                                    s2_num = m;
-                                    while (m < data2.station_num) {
-                                        if (data2.stations[++m] == t) {
-                                            t2_num = m;
-                                            flag = true;
-                                            m = data2.station_num + 1;
-                                        }
-                                    }
-                                }
-                            }
-                            if (!flag) continue;
-                            //date and time
-                            if (!date_change(ans1, data1, s1_num, t1_num, date, start1)) continue;
-                            if (!transfer_date(ans2, data2, s2_num, t2_num, ans1.arrive_date, ans1.arrive_time,
-                                               start2))
-                                continue;
-                            //price and seat
-                            cost_seat(ans1, data1, ids1[i], s1_num, t1_num, start1);
-                            cost_seat(ans2, data2, ids2[k], s2_num, t2_num, start2);
-                            transfer_data tmp;
-                            tmp.transfer = transfer;
-                            tmp.first = ans1;
-                            tmp.second = ans2;
-                            tmp.price_sum = ans1.price + ans2.price;
-                            tmp.time_sum = query_time(ans1.leave_date, ans1.leave_time, ans2.arrive_date,
-                                                      ans2.arrive_time);
-
-                            ans.push_back(tmp);
+            int s2_num, t2_num;
+            bool flag1= false;
+            bool flag2= false;
+            for(int j=1;j<data1.station_num;++j){
+                if(data1.stations[j]==s){
+                    s1_num=j;
+                    while (j < data1.station_num) {
+                        if (data1.stations[++j] == info[i].transfer) {
+                            flag1=true;
+                            t1_num = j;
+                            j = data1.station_num + 1;
                         }
                     }
                 }
             }
+            for(int j=1;j<data2.station_num;++j){
+                if(data2.stations[j]==info[i].transfer){
+                    s2_num=j;
+                    while (j < data2.station_num) {
+                        if (data2.stations[++j] == t) {
+                            flag2=true;
+                            t2_num = j;
+                            j = data2.station_num + 1;
+                        }
+                    }
+                }
+            }
+            if(!flag2||!flag1) continue;
+            Date start1,start2;
+            if (!date_change(ans1, data1, s1_num, t1_num, date, start1)) continue;
+            if (!transfer_date(ans2, data2, s2_num, t2_num, ans1.arrive_date, ans1.arrive_time,
+                               start2))
+                continue;
+            //price and seat
+            cost_seat(ans1, data1, info[i].id1, s1_num, t1_num, start1);
+            cost_seat(ans2, data2, info[i].id2, s2_num, t2_num, start2);
+            transfer_data tmp;
+            tmp.transfer = info[i].transfer;
+            tmp.first = ans1;
+            tmp.second = ans2;
+            tmp.price_sum = ans1.price + ans2.price;
+            tmp.time_sum = query_time(ans1.leave_date, ans1.leave_time, ans2.arrive_date,
+                                      ans2.arrive_time);
+
+            ans.push_back(tmp);
         }
+
         if (ans.empty()) {
             std::cout << "0" << "\n";
             return;
